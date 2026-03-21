@@ -1,5 +1,5 @@
 <div style="width: 100%; background: white; padding: 16px; box-sizing: border-box;">
-  <img src="./shared/logo.png" alt="DORA logo" width="100%" />
+  <img src="./shared/logo.jpg" alt="DORA logo" width="100%" />
 </div>
 
 # DORA
