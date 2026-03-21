@@ -1,3 +1,5 @@
+<img src="./shared/logo.png" alt="DORA logo" width="100%" />
+
 # DORA
 
 DORA is an educational meta search engine inspired by Dora the Explorer.
