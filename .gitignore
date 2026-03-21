@@ -1,0 +1,14 @@
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+backend/target/
+backend/.mvn/
+
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+.env
+.env.local
