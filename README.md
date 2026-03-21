@@ -11,6 +11,10 @@ multiple learning sources through one unified search experience.
 - Next.js
 - Tailwind CSS
 
+### Mobile
+
+- Flutter
+
 ### Backend
 
 - Spring Boot
@@ -44,6 +48,7 @@ We are starting with a modular monorepo:
 
 - `backend/` holds the Spring Boot application.
 - `frontend/` holds the Next.js web client.
+- `mobile/` holds the Flutter mobile application.
 - `docs/` stores architecture and planning notes.
 - `shared/` keeps cross-project contracts and shared schemas.
 - `crawler/` is reserved for controlled educational web crawling jobs.
