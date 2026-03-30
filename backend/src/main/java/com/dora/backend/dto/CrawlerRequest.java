@@ -10,4 +10,6 @@ import lombok.NoArgsConstructor;
 public class CrawlerRequest {
 
     private String url;
+    private Integer maxDepth;
+    private Integer maxPages;
 }

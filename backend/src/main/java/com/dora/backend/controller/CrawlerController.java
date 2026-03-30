@@ -20,7 +20,7 @@ public class CrawlerController {
 
     @PostMapping("/start")
     public Map<String, String> startCrawling(@RequestBody CrawlerRequest request) {
-        crawlerService.crawlPage(request.getUrl());
+        crawlerService.crawlPage(request.getUrl(), request.getMaxDepth(), request.getMaxPages());
         return Map.of("message", "Page crawled successfully");
     }
 }
