@@ -3,12 +3,15 @@ package com.dora.backend.service;
 import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SearchService {
+
+    private static final Logger logger = LoggerFactory.getLogger(SearchService.class);
 
     private final DocumentRepository documentRepository;
     private final YouTubeApiService youTubeApiService;
@@ -32,47 +35,46 @@ public class SearchService {
         boolean hasType = isPresent(normalizedType);
         boolean hasSource = isPresent(normalizedSource);
 
+        List<Document> results;
+
         if (!hasQuery && !hasType && !hasSource) {
-            return rankAndSort(documentRepository.findAll(), normalizedQuery);
+            results = new ArrayList<>(documentRepository.findAll());
+        } else if (hasQuery && !hasType && !hasSource) {
+            results = new ArrayList<>(
+                    documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                            normalizedQuery,
+                            normalizedQuery));
+        } else if (!hasQuery && hasType && !hasSource) {
+            results = new ArrayList<>(documentRepository.findByTypeIgnoreCase(normalizedType));
+        } else if (!hasQuery && !hasType && hasSource) {
+            results = new ArrayList<>(documentRepository.findBySourceIgnoreCase(normalizedSource));
+        } else {
+            results = new ArrayList<>(
+                    documentRepository.searchDocuments(normalizedQuery, normalizedType, normalizedSource));
         }
-
-        if (hasQuery && !hasType && !hasSource) {
-            List<Document> dbResults = documentRepository
-                    .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(normalizedQuery, normalizedQuery);
-            return rankAndSort(combineWithYouTube(dbResults, normalizedQuery), normalizedQuery);
-        }
-
-        if (!hasQuery && hasType && !hasSource) {
-            return rankAndSort(documentRepository.findByTypeIgnoreCase(normalizedType), normalizedQuery);
-        }
-
-        if (!hasQuery && !hasType && hasSource) {
-            return rankAndSort(documentRepository.findBySourceIgnoreCase(normalizedSource), normalizedQuery);
-        }
-
-        List<Document> dbResults = documentRepository.searchDocuments(normalizedQuery, normalizedType,
-                normalizedSource);
 
         if (hasQuery) {
-            return rankAndSort(combineWithYouTube(dbResults, normalizedQuery), normalizedQuery);
+            results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
         }
 
-        return rankAndSort(dbResults, normalizedQuery);
-    }
-
-    private List<Document> combineWithYouTube(List<Document> dbResults, String query) {
-        List<Document> combinedResults = new ArrayList<>(dbResults);
-        combinedResults.addAll(youTubeApiService.searchYouTube(query));
-        return combinedResults;
+        return rankAndSort(results, normalizedQuery);
     }
 
     private List<Document> rankAndSort(List<Document> results, String query) {
         for (Document document : results) {
             double score = rankingService.calculateScore(document, query);
             document.setScore(score);
+            logger.debug(
+                    "Ranking result | query='{}' | source='{}' | title='{}' | score={}",
+                    query,
+                    document.getSource(),
+                    document.getTitle(),
+                    score);
         }
 
-        results.sort(Comparator.comparing(Document::getScore, Comparator.nullsLast(Double::compareTo)).reversed());
+        results.sort((a, b) -> Double.compare(
+                b.getScore() == null ? 0.0 : b.getScore(),
+                a.getScore() == null ? 0.0 : a.getScore()));
         return results;
     }
 
