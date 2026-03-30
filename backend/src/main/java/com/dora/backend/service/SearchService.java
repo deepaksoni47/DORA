@@ -4,6 +4,7 @@ import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,38 +27,56 @@ public class SearchService {
         this.rankingService = rankingService;
     }
 
-    public List<Document> search(String query, String type, String source) {
+    public List<Document> search(String query, String source, int page, int size) {
         String normalizedQuery = normalize(query);
-        String normalizedType = normalize(type);
         String normalizedSource = normalize(source);
 
-        boolean hasQuery = isPresent(normalizedQuery);
-        boolean hasType = isPresent(normalizedType);
-        boolean hasSource = isPresent(normalizedSource);
-
-        List<Document> results;
-
-        if (!hasQuery && !hasType && !hasSource) {
-            results = new ArrayList<>(documentRepository.findAll());
-        } else if (hasQuery && !hasType && !hasSource) {
-            results = new ArrayList<>(
-                    documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                            normalizedQuery,
-                            normalizedQuery));
-        } else if (!hasQuery && hasType && !hasSource) {
-            results = new ArrayList<>(documentRepository.findByTypeIgnoreCase(normalizedType));
-        } else if (!hasQuery && !hasType && hasSource) {
-            results = new ArrayList<>(documentRepository.findBySourceIgnoreCase(normalizedSource));
-        } else {
-            results = new ArrayList<>(
-                    documentRepository.searchDocuments(normalizedQuery, normalizedType, normalizedSource));
+        if (!isPresent(normalizedQuery)) {
+            return List.of();
         }
 
-        if (hasQuery) {
-            results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? 10 : size;
+
+        List<Document> results = new ArrayList<>(
+                documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                        normalizedQuery,
+                        normalizedQuery));
+
+        results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
+
+        List<Document> rankedResults = rankAndSort(results, normalizedQuery);
+        List<Document> filteredResults = applySourceFilter(rankedResults, normalizedSource);
+
+        logger.info(
+                "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}'",
+                normalizedQuery,
+                safePage,
+                safeSize,
+                filteredResults.size(),
+                normalizedSource);
+
+        return paginate(filteredResults, safePage, safeSize);
+    }
+
+    private List<Document> applySourceFilter(List<Document> results, String source) {
+        if (!isPresent(source)) {
+            return results;
         }
 
-        return rankAndSort(results, normalizedQuery);
+        return results.stream()
+                .filter(document -> isPresent(document.getSource()) && document.getSource().equalsIgnoreCase(source))
+                .collect(Collectors.toList());
+    }
+
+    private List<Document> paginate(List<Document> results, int page, int size) {
+        int start = page * size;
+        if (start >= results.size()) {
+            return List.of();
+        }
+
+        int end = Math.min(start + size, results.size());
+        return results.subList(start, end);
     }
 
     private List<Document> rankAndSort(List<Document> results, String query) {

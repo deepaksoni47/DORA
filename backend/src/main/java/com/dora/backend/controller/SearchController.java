@@ -20,9 +20,10 @@ public class SearchController {
 
     @GetMapping
     public List<Document> search(
-            @RequestParam(value = "q", required = false) String query,
-            @RequestParam(value = "type", required = false) String type,
-            @RequestParam(value = "source", required = false) String source) {
-        return searchService.search(query, type, source);
+            @RequestParam("q") String query,
+            @RequestParam(value = "source", required = false) String source,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        return searchService.search(query, source, page, size);
     }
 }
