@@ -3,37 +3,200 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f6f1e8;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-border: rgba(72, 52, 34, 0.12);
-  --text: #2f2419;
-  --muted: #6f5b47;
-  --accent: #1f6f5f;
-  --accent-strong: #13463c;
-  --highlight: #d59b43;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
+  --bg: #fdfbf7;
+  --text: #2a2a2a;
 }
 
 body {
+  background-color: var(--bg);
   color: var(--text);
-  background:
-    radial-gradient(circle at top left, rgba(213, 155, 67, 0.25), transparent 30%),
-    radial-gradient(circle at top right, rgba(31, 111, 95, 0.18), transparent 28%),
-    linear-gradient(180deg, #f7f2e8 0%, #efe5d2 100%);
-  font-family: Georgia, "Times New Roman", serif;
 }
 
-a {
-  color: inherit;
+/* Base styles for Lenis */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* ─── Domain Storytelling Section ─── */
+
+.domain-spacer {
+  width: 100%;
+  height: 20vh;
+}
+
+.domain-arch {
+  display: flex;
+  gap: 60px;
+  justify-content: space-between;
+  max-width: 1100px;
+  margin-inline: auto;
+}
+
+.domain-arch__left {
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+}
+
+.domain-arch__info {
+  max-width: 380px;
+  height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.domain-arch__info .domain-content {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.domain-arch__header {
+  font-family: var(--font-inter), sans-serif;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.76px;
+  color: #2a2a2a;
+  line-height: 1.15;
+}
+
+.domain-arch__desc {
+  color: rgba(42, 42, 42, 0.7);
+  font-size: 17px;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.3px;
+  margin-top: 10px;
+  margin-bottom: 28px;
+  line-height: 1.6;
+}
+
+.domain-arch__link {
   text-decoration: none;
+  padding: 12px 20px;
+  color: #2a2a2a;
+  border-radius: 40px;
+  display: inline-flex;
+  gap: 8px;
+  width: fit-content;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.domain-arch__link:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 20px rgba(202, 154, 91, 0.2);
+}
+
+.domain-arch__link svg {
+  flex-shrink: 0;
+}
+
+.domain-arch__right {
+  flex-shrink: 1;
+  height: 100vh;
+  width: 100%;
+  max-width: 540px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.domain-img-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  height: 420px;
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(42, 42, 42, 0.12);
+}
+
+.domain-img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* ─── Responsive ─── */
+
+@media (max-width: 900px) {
+  .domain-arch {
+    gap: 30px;
+  }
+}
+
+@media (max-width: 768px) {
+  .domain-arch {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .domain-arch__left,
+  .domain-arch__right {
+    display: contents;
+  }
+
+  .domain-arch__right {
+    height: auto;
+    max-width: 100%;
+  }
+
+  .domain-img-wrapper {
+    position: static;
+    transform: none;
+    height: 340px;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  .domain-arch__info {
+    height: auto;
+    padding: 24px 0;
+  }
+
+  .domain-arch__info .domain-content {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .domain-arch {
+    gap: 12px;
+  }
+
+  .domain-img-wrapper {
+    border-radius: 10px;
+    height: 260px;
+  }
+
+  .domain-arch__header {
+    font-size: 28px;
+  }
+
+  .domain-arch__desc {
+    font-size: 15px;
+  }
 }

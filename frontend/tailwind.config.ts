@@ -8,7 +8,19 @@ const config: Config = {
     "./src/features/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        theme: {
+          bg: "#fdfbf7",
+          text: "#2a2a2a",
+          muted: "#737373",
+          accent: "#ca9a5b",
+        }
+      },
+      fontFamily: {
+        sans: ["var(--font-inter)", "sans-serif"],
+      }
+    },
   },
   plugins: [],
 };
