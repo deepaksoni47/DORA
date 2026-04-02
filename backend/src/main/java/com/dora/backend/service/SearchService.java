@@ -4,6 +4,7 @@ import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
 import com.dora.backend.util.QueryProcessor;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -33,34 +34,55 @@ public class SearchService {
     }
 
     public List<Document> search(String query, String source, int page, int size) {
+        String originalQuery = normalize(query);
         String normalizedQuery = QueryProcessor.normalize(query);
         String normalizedSource = normalize(source);
-        String[] words = tokenize(normalizedQuery);
+        String scoringQuery = isPresent(normalizedQuery) ? normalizedQuery : originalQuery;
+        String[] words = tokenize(scoringQuery);
 
-        logger.info("Original query: {}", query);
+        logger.info("Original query: {}", originalQuery);
         logger.info("Normalized query: {}", normalizedQuery);
 
-        if (!isPresent(normalizedQuery)) {
+        if (!isPresent(originalQuery)) {
             return List.of();
         }
 
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? 10 : size;
 
-        List<Document> results = new ArrayList<>(
-                documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                        normalizedQuery,
-                        normalizedQuery));
+        String apiQuery = isPresent(normalizedQuery) ? normalizedQuery : originalQuery;
 
-        results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
-        results.addAll(gitHubApiService.searchRepositories(normalizedQuery));
+        List<Document> dbResults = fetchDatabaseResults(normalizedQuery, originalQuery);
+        List<Document> youtubeResults = safeList(youTubeApiService.searchYouTube(apiQuery));
+        List<Document> githubResults = safeList(gitHubApiService.searchRepositories(apiQuery));
 
-        List<Document> rankedResults = rankAndSort(results, normalizedQuery, words);
+        logger.info(
+                "Source result counts | originalQuery='{}' | normalizedQuery='{}' | db={} | youtube={} | github={}",
+                originalQuery,
+                normalizedQuery,
+                dbResults.size(),
+                youtubeResults.size(),
+                githubResults.size());
+
+        if (dbResults.isEmpty() && youtubeResults.isEmpty() && githubResults.isEmpty() && isPresent(originalQuery)) {
+            youtubeResults = safeList(youTubeApiService.searchYouTube(originalQuery));
+            logger.info(
+                    "Fallback triggered | all sources empty using normalized query, retried YouTube with originalQuery='{}' | youtubeFallbackCount={}",
+                    originalQuery,
+                    youtubeResults.size());
+        }
+
+        List<Document> results = new ArrayList<>();
+        results.addAll(dbResults);
+        results.addAll(youtubeResults);
+        results.addAll(githubResults);
+
+        List<Document> rankedResults = rankAndSort(results, scoringQuery, words);
         List<Document> filteredResults = applySourceFilter(rankedResults, normalizedSource);
 
         logger.info(
                 "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}'",
-                normalizedQuery,
+                scoringQuery,
                 safePage,
                 safeSize,
                 filteredResults.size(),
@@ -87,6 +109,30 @@ public class SearchService {
 
         int end = Math.min(start + size, results.size());
         return results.subList(start, end);
+    }
+
+    private List<Document> fetchDatabaseResults(String normalizedQuery, String originalQuery) {
+        List<Document> normalizedResults = isPresent(normalizedQuery)
+                ? safeList(documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                        normalizedQuery,
+                        normalizedQuery))
+                : Collections.emptyList();
+
+        if (!normalizedResults.isEmpty()) {
+            return normalizedResults;
+        }
+
+        if (!isPresent(originalQuery) || originalQuery.equalsIgnoreCase(normalizedQuery)) {
+            return normalizedResults;
+        }
+
+        return safeList(documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+                originalQuery,
+                originalQuery));
+    }
+
+    private List<Document> safeList(List<Document> results) {
+        return results == null ? Collections.emptyList() : results;
     }
 
     private List<Document> rankAndSort(List<Document> results, String query, String[] words) {
