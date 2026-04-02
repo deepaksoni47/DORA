@@ -2,6 +2,7 @@ package com.dora.backend.service;
 
 import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
+import com.dora.backend.util.QueryProcessor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,8 +32,12 @@ public class SearchService {
     }
 
     public List<Document> search(String query, String source, int page, int size) {
-        String normalizedQuery = normalize(query);
+        String normalizedQuery = QueryProcessor.normalize(query);
         String normalizedSource = normalize(source);
+        String[] words = tokenize(normalizedQuery);
+
+        logger.info("Original query: {}", query);
+        logger.info("Normalized query: {}", normalizedQuery);
 
         if (!isPresent(normalizedQuery)) {
             return List.of();
@@ -49,7 +54,7 @@ public class SearchService {
         results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
         results.addAll(gitHubApiService.searchRepositories(normalizedQuery));
 
-        List<Document> rankedResults = rankAndSort(results, normalizedQuery);
+        List<Document> rankedResults = rankAndSort(results, normalizedQuery, words);
         List<Document> filteredResults = applySourceFilter(rankedResults, normalizedSource);
 
         logger.info(
@@ -83,12 +88,13 @@ public class SearchService {
         return results.subList(start, end);
     }
 
-    private List<Document> rankAndSort(List<Document> results, String query) {
+    private List<Document> rankAndSort(List<Document> results, String query, String[] words) {
         for (Document document : results) {
             double baseScore = "github".equalsIgnoreCase(document.getSource()) && document.getScore() != null
                     ? document.getScore()
                     : 0.0;
-            double score = baseScore + rankingService.calculateScore(document, query);
+            double score = baseScore + rankingService.calculateScore(document, query)
+                    + calculateKeywordBoost(document, words);
             document.setScore(score);
             logger.debug(
                     "Ranking result | query='{}' | source='{}' | title='{}' | score={}",
@@ -102,6 +108,103 @@ public class SearchService {
                 b.getScore() == null ? 0.0 : b.getScore(),
                 a.getScore() == null ? 0.0 : a.getScore()));
         return results;
+    }
+
+    private double calculateKeywordBoost(Document document, String[] words) {
+        String title = normalize(document.getTitle());
+        String description = normalize(document.getDescription());
+        double boost = 0.0;
+        int matchedWords = 0;
+
+        // Boost for individual keyword matches
+        for (String word : words) {
+            if (!isPresent(word)) {
+                continue;
+            }
+
+            boolean titleMatch = titleContainsWord(title, word);
+            boolean descriptionMatch = descriptionContainsWord(description, word);
+
+            if (titleMatch) {
+                boost += 15.0; // Title match is highly relevant
+                matchedWords++;
+            }
+
+            if (descriptionMatch) {
+                boost += 8.0; // Description match is moderately relevant
+                if (!titleMatch) {
+                    matchedWords++;
+                }
+            }
+        }
+
+        // Bonus for matching all keywords (full query coverage)
+        if (words.length > 0 && matchedWords == words.length) {
+            boost += 20.0;
+        }
+
+        // Bonus for pedagogical keywords (tutorial, guide, beginner, course)
+        if (containsAny(title, description, "beginner", "beginners", "tutorial", "course", "guide", "introduction",
+                "basics")) {
+            boost += 12.0;
+        }
+
+        // Penalty for no matching keywords (unlikely to be relevant)
+        if (matchedWords == 0) {
+            boost -= 10.0;
+        }
+
+        return Math.max(boost, 0.0); // Never go below 0
+    }
+
+    /**
+     * Check if title contains word as a complete word (not substring).
+     * "data structures" contains "structures" but not "struct".
+     */
+    private boolean titleContainsWord(String title, String word) {
+        if (!isPresent(title) || !isPresent(word)) {
+            return false;
+        }
+        String[] titleWords = title.split("\\s+");
+        for (String titleWord : titleWords) {
+            if (titleWord.equals(word) || titleWord.contains(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if description contains word as a complete word (not substring).
+     */
+    private boolean descriptionContainsWord(String description, String word) {
+        if (!isPresent(description) || !isPresent(word)) {
+            return false;
+        }
+        String[] descWords = description.split("\\s+");
+        for (String descWord : descWords) {
+            if (descWord.equals(word) || descWord.contains(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsAny(String title, String description, String... keywords) {
+        for (String keyword : keywords) {
+            if (title.contains(keyword) || description.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String[] tokenize(String normalizedQuery) {
+        if (!isPresent(normalizedQuery)) {
+            return new String[0];
+        }
+
+        return normalizedQuery.split(" ");
     }
 
     private String normalize(String value) {
