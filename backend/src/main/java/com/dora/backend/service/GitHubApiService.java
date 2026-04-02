@@ -94,7 +94,7 @@ public class GitHubApiService {
             logger.info("GitHub Search API returned {} repositories for query='{}'", documents.size(), query);
             return documents;
         } catch (Exception ex) {
-            logger.warn("GitHub Search API failed for query='{}': {}", query, ex.getMessage());
+            logger.error("Error while fetching GitHub results", ex);
             return Collections.emptyList();
         }
     }
