@@ -16,14 +16,17 @@ public class SearchService {
 
     private final DocumentRepository documentRepository;
     private final YouTubeApiService youTubeApiService;
+    private final GitHubApiService gitHubApiService;
     private final RankingService rankingService;
 
     public SearchService(
             DocumentRepository documentRepository,
             YouTubeApiService youTubeApiService,
+            GitHubApiService gitHubApiService,
             RankingService rankingService) {
         this.documentRepository = documentRepository;
         this.youTubeApiService = youTubeApiService;
+        this.gitHubApiService = gitHubApiService;
         this.rankingService = rankingService;
     }
 
@@ -44,6 +47,7 @@ public class SearchService {
                         normalizedQuery));
 
         results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
+        results.addAll(gitHubApiService.searchRepositories(normalizedQuery));
 
         List<Document> rankedResults = rankAndSort(results, normalizedQuery);
         List<Document> filteredResults = applySourceFilter(rankedResults, normalizedSource);
@@ -81,7 +85,10 @@ public class SearchService {
 
     private List<Document> rankAndSort(List<Document> results, String query) {
         for (Document document : results) {
-            double score = rankingService.calculateScore(document, query);
+            double baseScore = "github".equalsIgnoreCase(document.getSource()) && document.getScore() != null
+                    ? document.getScore()
+                    : 0.0;
+            double score = baseScore + rankingService.calculateScore(document, query);
             document.setScore(score);
             logger.debug(
                     "Ranking result | query='{}' | source='{}' | title='{}' | score={}",
