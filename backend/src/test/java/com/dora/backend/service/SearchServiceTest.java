@@ -63,7 +63,7 @@ class SearchServiceTest {
         when(wikipediaService.searchConcept(eq("data structures"))).thenReturn(List.of());
         when(arxivApiService.searchPapers(eq("data structures"))).thenReturn(List.of());
 
-        List<Document> results = searchService.search("I want to learn data structures", null, 0, 10);
+        List<Document> results = searchService.search("I want to learn data structures", null, null, 0, 10);
 
         assertThat(results).containsExactly(titleMatch, descriptionMatch);
         assertThat(titleMatch.getScore()).isGreaterThan(descriptionMatch.getScore());
@@ -84,7 +84,7 @@ class SearchServiceTest {
                 new RankingService(),
                 new QueryOptimizer());
 
-        List<Document> results = searchService.search(null, null, 0, 10);
+        List<Document> results = searchService.search(null, null, null, 0, 10);
 
         assertThat(results).isEmpty();
         verify(documentRepository, never()).findAll(any(Specification.class));
