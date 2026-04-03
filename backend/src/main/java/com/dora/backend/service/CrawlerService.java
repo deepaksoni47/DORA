@@ -113,6 +113,7 @@ public class CrawlerService {
                 crawl(nextUrl, depth + 1, maxDepth, maxPages, baseDomain, visitedUrls, pagesCrawled);
             }
         } catch (IOException ex) {
+            logger.error("Crawler failed for URL: {}", url, ex);
             throw new IllegalStateException("Failed to crawl page: " + url, ex);
         }
     }
@@ -145,7 +146,7 @@ public class CrawlerService {
         document.setSource("crawler");
         document.setType("article");
         document.setYear(Year.now().getValue());
-        document.setScore(0.0);
+        document.setScore(75.0);
         return document;
     }
 

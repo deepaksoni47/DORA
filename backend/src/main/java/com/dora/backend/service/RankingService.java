@@ -3,6 +3,7 @@ package com.dora.backend.service;
 import com.dora.backend.entity.Document;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,8 +23,22 @@ public class RankingService {
         return keywords.stream()
                 .map(this::normalize)
                 .filter(keyword -> !keyword.isEmpty())
+                .distinct()
                 .mapToDouble(keyword -> scoreKeywordMatch(keyword, normalizedTitle, normalizedDescription))
                 .sum();
+    }
+
+    public double calculateScore(Document doc, String query) {
+        if (query == null || query.isBlank()) {
+            return 0.0;
+        }
+
+        List<String> keywords = java.util.Arrays.stream(query.trim().split("\\s+"))
+                .map(this::normalize)
+                .filter(keyword -> !keyword.isEmpty())
+                .collect(Collectors.toList());
+
+        return calculateScore(doc, keywords);
     }
 
     private double scoreKeywordMatch(String keyword, String normalizedTitle, String normalizedDescription) {

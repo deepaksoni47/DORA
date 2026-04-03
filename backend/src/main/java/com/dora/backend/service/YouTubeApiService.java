@@ -7,6 +7,8 @@ import java.time.Year;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -16,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class YouTubeApiService {
 
     private static final String YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
+    private static final Logger logger = LoggerFactory.getLogger(YouTubeApiService.class);
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -37,7 +40,7 @@ public class YouTubeApiService {
                     .queryParam("part", "snippet")
                     .queryParam("q", query.trim())
                     .queryParam("type", "video")
-                    .queryParam("maxResults", 10)
+                    .queryParam("maxResults", 50)
                     .queryParam("key", youtubeApiKey)
                     .toUriString();
 
@@ -71,12 +74,13 @@ public class YouTubeApiService {
                 document.setSource("youtube");
                 document.setType("video");
                 document.setYear(currentYear);
-                document.setScore(0.0);
+                document.setScore(65.0);
                 documents.add(document);
             }
 
             return documents;
         } catch (Exception ex) {
+            logger.error("Error while fetching YouTube results", ex);
             return Collections.emptyList();
         }
     }

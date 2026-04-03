@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 
-const TABS = ["All", "Papers", "Videos", "Code", "Articles"];
+const TABS = ["All", "Papers", "Videos", "Resources"];
 
 interface TabsProps {
   activeTab: string;

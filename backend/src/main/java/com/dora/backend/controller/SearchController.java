@@ -20,10 +20,14 @@ public class SearchController {
 
     @GetMapping
     public List<Document> search(
-            @RequestParam("q") String query,
+            @RequestParam(value = "q", required = false) String query,
             @RequestParam(value = "source", required = false) String source,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size) {
+        if (query == null || query.trim().isEmpty()) {
+            throw new IllegalArgumentException("Invalid query parameter");
+        }
+
         return searchService.search(query, source, page, size);
     }
 }

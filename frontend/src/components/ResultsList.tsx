@@ -4,41 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import ResultCard, { ResultItem } from "./ResultCard";
 
-const MOCK_RESULTS: ResultItem[] = [
-  {
-    id: "1",
-    title: "Attention Is All You Need",
-    description: "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. We propose a new simple network architecture, the Transformer...",
-    source: "arXiv:1706.03762",
-    type: "Paper",
-    year: 2017
-  },
-  {
-    id: "2",
-    title: "Graph Neural Networks for knowledge representation",
-    description: "A comprehensive overview of graph neural networks (GNNs) in natural language processing and knowledge graph representation, demonstrating state-of-the-art results...",
-    source: "Medium Towards Data Science",
-    type: "Article",
-    year: 2023
-  },
-  {
-    id: "3",
-    title: "Building a RAG System from Scratch",
-    description: "Step-by-step video lecture on how to implement Retrieval-Augmented Generation using LangChain and Pinecone. Includes source code review and architectural deep dive.",
-    source: "YouTube / AI Engineer",
-    type: "Video",
-    year: 2024
-  },
-  {
-    id: "4",
-    title: "langchain-ai / langchain",
-    description: "⚡ Building applications with LLMs through composability ⚡",
-    source: "GitHub",
-    type: "Code",
-    year: 2024
-  }
-];
-
 interface ResultsListProps {
   activeCategory: string;
   searchQuery?: string;
@@ -50,21 +15,31 @@ export default function ResultsList({ activeCategory, searchQuery }: ResultsList
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Simulate fetch based on filters
+    const controller = new AbortController();
     setIsLoading(true);
     setResults([]);
     
-    const timer = setTimeout(() => {
-      let filtered = MOCK_RESULTS;
-      if (activeCategory !== "All") {
-         filtered = MOCK_RESULTS.filter(r => (activeCategory.includes(r.type) || r.type.includes(activeCategory.replace(/s$/, ''))));
-      }
-      
-      setResults(filtered);
-      setIsLoading(false);
-    }, 600); // 600ms artificial delay for skeleton
+    let typeParam = "";
+    if (activeCategory === "Papers") typeParam = "paper";
+    else if (activeCategory === "Videos") typeParam = "video";
+    else if (activeCategory === "Resources") typeParam = "article,blog,book,course,repository,reference,concept";
+    
+    const formattedQuery = searchQuery?.trim() || "machine learning";
+    const fetchUrl = `/api/search?q=${encodeURIComponent(formattedQuery)}${typeParam ? `&type=${typeParam}` : ""}`;
+    
+    fetch(fetchUrl, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => {
+        setResults(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return;
+        console.error("Failed to fetch results:", err);
+        setIsLoading(false);
+      });
 
-    return () => clearTimeout(timer);
+    return () => controller.abort();
   }, [activeCategory, searchQuery]);
 
   useEffect(() => {
@@ -111,7 +86,7 @@ export default function ResultsList({ activeCategory, searchQuery }: ResultsList
 
   return (
     <div ref={listRef} className="w-full max-w-3xl space-y-4 pt-2 pb-20">
-      {results.map((item, i) => (
+      {results.map((item) => (
         <ResultCard key={item.id} item={item} />
       ))}
     </div>

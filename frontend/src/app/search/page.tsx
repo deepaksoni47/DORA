@@ -52,7 +52,7 @@ function SearchContent() {
         
         {/* Results Container */}
         <div className="flex-1 flex justify-center w-full relative z-10 min-w-0">
-          <ResultsList activeCategory={activeTab} searchQuery={query} />
+          <ResultsList key={`${query}-${activeTab}`} activeCategory={activeTab} searchQuery={query} />
         </div>
       </main>
     </div>

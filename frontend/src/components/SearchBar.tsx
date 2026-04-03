@@ -84,10 +84,10 @@ export default function SearchBar({
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const query = formData.get("q")?.toString().trim();
+    const input = e.currentTarget.elements.namedItem("q") as HTMLInputElement;
+    const query = input?.value.trim() || "";
     if (query) {
       router.push(`/search?q=${encodeURIComponent(query)}`);
     } else {
