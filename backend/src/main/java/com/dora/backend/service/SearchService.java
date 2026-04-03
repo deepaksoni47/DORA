@@ -1,8 +1,10 @@
 package com.dora.backend.service;
 
 import com.dora.backend.entity.Document;
+import com.dora.backend.repository.DocumentSpecifications;
 import com.dora.backend.repository.DocumentRepository;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -17,40 +19,45 @@ public class SearchService {
     private final DocumentRepository documentRepository;
     private final YouTubeApiService youTubeApiService;
     private final RankingService rankingService;
+    private final QueryPreprocessorService queryPreprocessorService;
 
     public SearchService(
             DocumentRepository documentRepository,
             YouTubeApiService youTubeApiService,
-            RankingService rankingService) {
+            RankingService rankingService,
+            QueryPreprocessorService queryPreprocessorService) {
         this.documentRepository = documentRepository;
         this.youTubeApiService = youTubeApiService;
         this.rankingService = rankingService;
+        this.queryPreprocessorService = queryPreprocessorService;
     }
 
     public List<Document> search(String query, String source, int page, int size) {
         String normalizedQuery = normalize(query);
+        String cleanedQuery = queryPreprocessorService.preprocess(normalizedQuery);
+        List<String> keywords = queryPreprocessorService.extractKeywords(cleanedQuery);
         String normalizedSource = normalize(source);
 
-        if (!isPresent(normalizedQuery)) {
+        if (keywords.isEmpty()) {
             return List.of();
         }
 
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? 10 : size;
 
-        List<Document> results = new ArrayList<>(
-                documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                        normalizedQuery,
-                        normalizedQuery));
+        List<Document> results = new ArrayList<>(documentRepository.findAll(
+                DocumentSpecifications.hasAnyKeywordInTitleOrDescription(keywords)));
 
-        results.addAll(youTubeApiService.searchYouTube(normalizedQuery));
+        results.addAll(youTubeApiService.searchYouTube(cleanedQuery));
 
-        List<Document> rankedResults = rankAndSort(results, normalizedQuery);
+        List<Document> rankedResults = rankAndSort(results, keywords);
         List<Document> filteredResults = applySourceFilter(rankedResults, normalizedSource);
 
         logger.info(
-                "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}'",
+                "Search request | query='{}' | cleanedQuery='{}' | keywords={} | page={} | size={} | totalResults={} | source='{}'",
                 normalizedQuery,
+                cleanedQuery,
+                keywords,
                 safePage,
                 safeSize,
                 filteredResults.size(),
@@ -79,22 +86,24 @@ public class SearchService {
         return results.subList(start, end);
     }
 
-    private List<Document> rankAndSort(List<Document> results, String query) {
-        for (Document document : results) {
-            double score = rankingService.calculateScore(document, query);
-            document.setScore(score);
-            logger.debug(
-                    "Ranking result | query='{}' | source='{}' | title='{}' | score={}",
-                    query,
-                    document.getSource(),
-                    document.getTitle(),
-                    score);
-        }
+    private List<Document> rankAndSort(List<Document> results, List<String> keywords) {
+        return results.stream()
+                .peek(document -> {
+                    double score = rankingService.calculateScore(document, keywords);
+                    document.setScore(score);
+                    logger.debug(
+                            "Ranking result | keywords={} | source='{}' | title='{}' | score={}",
+                            keywords,
+                            document.getSource(),
+                            document.getTitle(),
+                            score);
+                })
+                .sorted(Comparator.comparingDouble(this::getScoreSafely).reversed())
+                .collect(Collectors.toList());
+    }
 
-        results.sort((a, b) -> Double.compare(
-                b.getScore() == null ? 0.0 : b.getScore(),
-                a.getScore() == null ? 0.0 : a.getScore()));
-        return results;
+    private double getScoreSafely(Document document) {
+        return document.getScore() == null ? 0.0 : document.getScore();
     }
 
     private String normalize(String value) {
