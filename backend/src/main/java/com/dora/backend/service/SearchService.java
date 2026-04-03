@@ -2,7 +2,6 @@ package com.dora.backend.service;
 
 import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
-import com.dora.backend.util.QueryProcessor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,7 +9,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class SearchService {
@@ -20,69 +18,64 @@ public class SearchService {
     private final DocumentRepository documentRepository;
     private final YouTubeApiService youTubeApiService;
     private final GitHubApiService gitHubApiService;
+    private final ArxivApiService arxivApiService;
+    private final WikipediaService wikipediaService;
     private final RankingService rankingService;
 
     public SearchService(
             DocumentRepository documentRepository,
             YouTubeApiService youTubeApiService,
             GitHubApiService gitHubApiService,
+            ArxivApiService arxivApiService,
+            WikipediaService wikipediaService,
             RankingService rankingService) {
         this.documentRepository = documentRepository;
         this.youTubeApiService = youTubeApiService;
         this.gitHubApiService = gitHubApiService;
+        this.arxivApiService = arxivApiService;
+        this.wikipediaService = wikipediaService;
         this.rankingService = rankingService;
     }
 
     public List<Document> search(String query, String source, int page, int size) {
-        String originalQuery = normalize(query);
-        String normalizedQuery = QueryProcessor.normalize(query);
+        String normalizedQuery = normalizeQuery(query);
         String normalizedSource = normalize(source);
-        String scoringQuery = isPresent(normalizedQuery) ? normalizedQuery : originalQuery;
-        String[] words = tokenize(scoringQuery);
+        String[] words = tokenize(normalizedQuery);
 
-        logger.info("Original query: {}", originalQuery);
         logger.info("Normalized query: {}", normalizedQuery);
 
-        if (!isPresent(originalQuery)) {
+        if (!isPresent(normalizedQuery)) {
             return List.of();
         }
 
         int safePage = Math.max(page, 0);
         int safeSize = size <= 0 ? 10 : size;
 
-        String apiQuery = isPresent(normalizedQuery) ? normalizedQuery : originalQuery;
+        List<Document> youtubeResults = safeList(youTubeApiService.searchYouTube(normalizedQuery));
+        List<Document> githubResults = safeList(gitHubApiService.searchRepositories(normalizedQuery));
+        List<Document> crawlerResults = fetchCrawlerResults(normalizedQuery);
+        List<Document> wikipediaResults = safeList(wikipediaService.searchConcept(normalizedQuery));
+        List<Document> arxivResults = safeList(arxivApiService.searchPapers(normalizedQuery));
 
-        List<Document> dbResults = fetchDatabaseResults(normalizedQuery, originalQuery);
-        List<Document> youtubeResults = safeList(youTubeApiService.searchYouTube(apiQuery));
-        List<Document> githubResults = safeList(gitHubApiService.searchRepositories(apiQuery));
-
-        logger.info(
-                "Source result counts | originalQuery='{}' | normalizedQuery='{}' | db={} | youtube={} | github={}",
-                originalQuery,
-                normalizedQuery,
-                dbResults.size(),
-                youtubeResults.size(),
-                githubResults.size());
-
-        if (dbResults.isEmpty() && youtubeResults.isEmpty() && githubResults.isEmpty() && isPresent(originalQuery)) {
-            youtubeResults = safeList(youTubeApiService.searchYouTube(originalQuery));
-            logger.info(
-                    "Fallback triggered | all sources empty using normalized query, retried YouTube with originalQuery='{}' | youtubeFallbackCount={}",
-                    originalQuery,
-                    youtubeResults.size());
-        }
+        logger.info("YouTube results: {}", youtubeResults.size());
+        logger.info("GitHub results: {}", githubResults.size());
+        logger.info("Crawler results: {}", crawlerResults.size());
+        logger.info("Wikipedia results: {}", wikipediaResults.size());
+        logger.info("Arxiv results: {}", arxivResults.size());
 
         List<Document> results = new ArrayList<>();
-        results.addAll(dbResults);
         results.addAll(youtubeResults);
         results.addAll(githubResults);
+        results.addAll(crawlerResults);
+        results.addAll(arxivResults);
+        results.addAll(wikipediaResults);
 
-        List<Document> rankedResults = rankAndSort(results, scoringQuery, words);
+        List<Document> rankedResults = rankAndSort(results, normalizedQuery, words);
         List<Document> filteredResults = applySourceFilter(rankedResults, normalizedSource);
 
         logger.info(
                 "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}'",
-                scoringQuery,
+                normalizedQuery,
                 safePage,
                 safeSize,
                 filteredResults.size(),
@@ -111,24 +104,14 @@ public class SearchService {
         return results.subList(start, end);
     }
 
-    private List<Document> fetchDatabaseResults(String normalizedQuery, String originalQuery) {
-        List<Document> normalizedResults = isPresent(normalizedQuery)
-                ? safeList(documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                        normalizedQuery,
-                        normalizedQuery))
-                : Collections.emptyList();
-
-        if (!normalizedResults.isEmpty()) {
-            return normalizedResults;
-        }
-
-        if (!isPresent(originalQuery) || originalQuery.equalsIgnoreCase(normalizedQuery)) {
-            return normalizedResults;
+    private List<Document> fetchCrawlerResults(String normalizedQuery) {
+        if (!isPresent(normalizedQuery)) {
+            return Collections.emptyList();
         }
 
         return safeList(documentRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
-                originalQuery,
-                originalQuery));
+                normalizedQuery,
+                normalizedQuery));
     }
 
     private List<Document> safeList(List<Document> results) {
@@ -137,9 +120,7 @@ public class SearchService {
 
     private List<Document> rankAndSort(List<Document> results, String query, String[] words) {
         for (Document document : results) {
-            double baseScore = "github".equalsIgnoreCase(document.getSource()) && document.getScore() != null
-                    ? document.getScore()
-                    : 0.0;
+            double baseScore = document.getScore() == null ? 0.0 : document.getScore();
             double score = baseScore + rankingService.calculateScore(document, query)
                     + calculateKeywordBoost(document, words);
             document.setScore(score);
@@ -256,6 +237,10 @@ public class SearchService {
 
     private String normalize(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeQuery(String query) {
+        return query == null ? "" : query.toLowerCase().trim();
     }
 
     private boolean isPresent(String value) {
