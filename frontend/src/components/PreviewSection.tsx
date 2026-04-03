@@ -6,9 +6,9 @@ import ScrollTrigger from "gsap/ScrollTrigger";
 import ResultCard, { ResultItem } from "./ResultCard";
 
 const PREVIEW_RESULTS: ResultItem[] = [
-  { id: "p1", title: "Emergent Abilities of Large Language Models", description: "Analyzing how scaling up language models leads to sudden improvements on certain tasks...", source: "TMLR 2022", type: "Paper", year: 2022 },
-  { id: "p2", title: "Neural Networks: Zero to Hero", description: "A course by Andrej Karpathy on building neural networks, from backpropagation to GPT.", source: "YouTube", type: "Video", year: 2023 },
-  { id: "p3", title: "karpathy/micrograd", description: "A tiny scalar-valued autograd engine with a small PyTorch-like neural network library on top.", source: "GitHub", type: "Code", year: 2020 }
+  { id: "p1", title: "Emergent Abilities of Large Language Models", description: "Analyzing how scaling up language models leads to sudden improvements on certain tasks...", source: "TMLR 2022", type: "paper", year: 2022, url: "https://arxiv.org/abs/2206.07682" },
+  { id: "p2", title: "Neural Networks: Zero to Hero", description: "A course by Andrej Karpathy on building neural networks, from backpropagation to GPT.", source: "YouTube", type: "video", year: 2023, url: "https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUbznKZ" },
+  { id: "p3", title: "karpathy/micrograd", description: "A tiny scalar-valued autograd engine with a small PyTorch-like neural network library on top.", source: "GitHub", type: "repository", year: 2020, url: "https://github.com/karpathy/micrograd" }
 ];
 
 function LeafIcon() {
