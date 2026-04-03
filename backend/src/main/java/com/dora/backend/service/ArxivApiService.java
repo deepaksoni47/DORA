@@ -25,7 +25,7 @@ public class ArxivApiService {
 
     private static final Logger logger = LoggerFactory.getLogger(ArxivApiService.class);
     private static final String ARXIV_SEARCH_URL = "https://export.arxiv.org/api/query";
-    private static final int MAX_RESULTS = 10;
+    private static final int MAX_RESULTS = 100;
     private static final int MAX_DESCRIPTION_LENGTH = 700;
 
     private final RestTemplate restTemplate;
@@ -42,10 +42,26 @@ public class ArxivApiService {
 
         String trimmedQuery = query.trim();
         try {
+            String enhancedQuery = trimmedQuery.toLowerCase();
+            if (enhancedQuery.equals("dsa")) {
+                enhancedQuery = "data structures algorithms";
+            }
+            if (enhancedQuery.split(" ").length == 1 && !enhancedQuery.equals("data structures")
+                    && !enhancedQuery.equals("data structures algorithms")) {
+                enhancedQuery = enhancedQuery + " algorithms";
+            }
+
+            String formattedQuery;
+            if (enhancedQuery.contains(" ")) {
+                formattedQuery = "all:\"" + enhancedQuery + "\"";
+            } else {
+                formattedQuery = "all:" + enhancedQuery;
+            }
+
             String url = UriComponentsBuilder.fromHttpUrl(ARXIV_SEARCH_URL)
-                    .queryParam("search_query", "all:" + trimmedQuery)
+                    .queryParam("search_query", formattedQuery)
                     .queryParam("start", 0)
-                    .queryParam("max_results", MAX_RESULTS)
+                    .queryParam("max_results", 20)
                     .toUriString();
 
             String response = restTemplate.getForObject(url, String.class);
@@ -56,7 +72,7 @@ public class ArxivApiService {
             }
 
             List<Document> papers = parseArxivResponse(response);
-            logger.info("Arxiv query='{}' fetched {} papers", trimmedQuery, papers.size());
+            logger.info("ArxivApiService: Found {} results for query='{}'", papers.size(), trimmedQuery);
             logger.info("Arxiv size: {}", papers.size());
             return papers;
         } catch (Exception ex) {
@@ -67,56 +83,70 @@ public class ArxivApiService {
     }
 
     private List<Document> parseArxivResponse(String xmlResponse) throws Exception {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        factory.setXIncludeAware(false);
-        factory.setExpandEntityReferences(false);
-        factory.setNamespaceAware(true);
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            factory.setNamespaceAware(true);
 
-        DocumentBuilder builder = factory.newDocumentBuilder();
-        org.w3c.dom.Document xmlDocument = builder.parse(new InputSource(new StringReader(xmlResponse)));
-        NodeList entries = xmlDocument.getElementsByTagNameNS("*", "entry");
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            org.w3c.dom.Document xmlDocument = builder.parse(new InputSource(new StringReader(xmlResponse)));
+            NodeList entries = xmlDocument.getElementsByTagNameNS("*", "entry");
 
-        List<Document> papers = new ArrayList<>();
-        for (int i = 0; i < entries.getLength(); i++) {
-            Node node = entries.item(i);
-            if (node.getNodeType() != Node.ELEMENT_NODE) {
-                continue;
+            List<Document> papers = new ArrayList<>();
+            for (int i = 0; i < entries.getLength(); i++) {
+                try {
+                    Node node = entries.item(i);
+                    if (node.getNodeType() != Node.ELEMENT_NODE) {
+                        continue;
+                    }
+
+                    Element entry = (Element) node;
+                    String title = safeGetText(entry, "title");
+                    String summary = safeGetText(entry, "summary");
+                    String id = safeGetText(entry, "id");
+                    Integer year = extractPublishedYear(safeGetText(entry, "published"));
+
+                    if (isBlank(title) || isBlank(id)) {
+                        continue;
+                    }
+
+                    Document paper = new Document();
+                    paper.setTitle(title);
+                    paper.setDescription(trimDescription(summary));
+                    paper.setUrl(id);
+                    paper.setSource("arxiv");
+                    paper.setType("paper");
+                    paper.setYear(year);
+                    paper.setScore(95.0);
+                    papers.add(paper);
+                } catch (Exception e) {
+                    logger.debug("Failed to parse arXiv entry at index {}", i, e);
+                    continue;
+                }
             }
 
-            Element entry = (Element) node;
-            String title = cleanText(getFirstElementText(entry, "title"));
-            String summary = cleanText(getFirstElementText(entry, "summary"));
-            String id = cleanText(getFirstElementText(entry, "id"));
-            Integer year = extractPublishedYear(getFirstElementText(entry, "published"));
-
-            if (isBlank(title) || isBlank(id)) {
-                continue;
-            }
-
-            Document paper = new Document();
-            paper.setTitle(title);
-            paper.setDescription(trimDescription(summary));
-            paper.setUrl(id);
-            paper.setSource("arxiv");
-            paper.setType("paper");
-            paper.setYear(year);
-            paper.setScore(50.0);
-            papers.add(paper);
+            return papers;
+        } catch (Exception ex) {
+            logger.error("ArxivApiService: Failed to parse XML response", ex);
+            return Collections.emptyList();
         }
-
-        return papers;
     }
 
-    private String getFirstElementText(Element parent, String tagName) {
-        NodeList nodes = parent.getElementsByTagNameNS("*", tagName);
-        if (nodes.getLength() == 0) {
+    private String safeGetText(Element parent, String tag) {
+        try {
+            NodeList nodes = parent.getElementsByTagNameNS("*", tag);
+            if (nodes.getLength() > 0 && nodes.item(0) != null) {
+                return cleanText(nodes.item(0).getTextContent());
+            }
+        } catch (Exception ignored) {
             return "";
         }
-        return nodes.item(0).getTextContent();
+        return "";
     }
 
     private Integer extractPublishedYear(String published) {

@@ -42,7 +42,7 @@ public class GitHubApiService {
         try {
             String url = UriComponentsBuilder.fromHttpUrl(GITHUB_SEARCH_URL)
                     .queryParam("q", query.trim())
-                    .queryParam("per_page", 10)
+                    .queryParam("per_page", 100)
                     .toUriString();
 
             HttpHeaders headers = new HttpHeaders();
@@ -87,7 +87,7 @@ public class GitHubApiService {
                 document.setSource("github");
                 document.setType("repository");
                 document.setYear(currentYear);
-                document.setScore((double) stars);
+                document.setScore(80.0 + Math.min(stars, 10));
                 documents.add(document);
             }
 

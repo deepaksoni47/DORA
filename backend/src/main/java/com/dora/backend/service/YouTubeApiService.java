@@ -40,7 +40,7 @@ public class YouTubeApiService {
                     .queryParam("part", "snippet")
                     .queryParam("q", query.trim())
                     .queryParam("type", "video")
-                    .queryParam("maxResults", 10)
+                    .queryParam("maxResults", 50)
                     .queryParam("key", youtubeApiKey)
                     .toUriString();
 
@@ -74,7 +74,7 @@ public class YouTubeApiService {
                 document.setSource("youtube");
                 document.setType("video");
                 document.setYear(currentYear);
-                document.setScore(0.0);
+                document.setScore(65.0);
                 documents.add(document);
             }
 

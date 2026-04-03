@@ -69,21 +69,9 @@ public class RankingService {
             }
         }
 
-        // Source-based scoring (ensure quality content types are boosted)
-        if ("youtube".equalsIgnoreCase(normalizedSource)) {
-            score += 20.0; // Video tutorials are valuable
-        } else if ("crawler".equalsIgnoreCase(normalizedSource)) {
-            score += 10.0; // Web crawled content has moderate value
-        } else if ("database".equalsIgnoreCase(normalizedSource) ||
-                normalizedSource.isEmpty()) {
-            score += 15.0; // Local database content is curated
-        } else if ("github".equalsIgnoreCase(normalizedSource)) {
-            // GitHub scoring handled by SearchService using star count
-            // Additional relevance boost if matched well
-            if (!normalizedQuery.isEmpty()) {
-                score += 5.0;
-            }
-        }
+        // Source-based scoring removed to ensure fair ranking based on content
+        // relevance
+        // All sources now compete equally on content quality and keyword matching
 
         return Math.max(score, 0.0); // Ensure non-negative scores
     }

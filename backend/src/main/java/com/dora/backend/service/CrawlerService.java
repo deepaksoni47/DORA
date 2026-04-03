@@ -146,7 +146,7 @@ public class CrawlerService {
         document.setSource("crawler");
         document.setType("article");
         document.setYear(Year.now().getValue());
-        document.setScore(0.0);
+        document.setScore(75.0);
         return document;
     }
 

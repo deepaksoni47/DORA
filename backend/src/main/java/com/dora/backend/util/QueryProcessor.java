@@ -1,196 +1,271 @@
 package com.dora.backend.util;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * QueryProcessor: Transforms natural language queries into optimized search
- * terms.
- *
- * Responsibilities:
- * - Remove common stop words (filler words that don't add meaning)
- * - Expand abbreviations into full terms (dsa → data structures algorithms)
- * - Detect learning intent and add relevant keywords (tutorial, beginner,
- * guide)
- * - Extract meaningful keywords for scoring
- *
- * This ensures queries like "i want to start dsa" become:
- * "data structures algorithms tutorial beginner"
+ * Provides safe and deterministic query normalization for search operations.
  */
-public class QueryProcessor {
+public final class QueryProcessor {
 
-    // Comprehensive set of common English words that don't add search value
-    private static final Set<String> STOP_WORDS = buildStopWordsSet();
+    private static final Logger logger = LoggerFactory.getLogger(QueryProcessor.class);
 
-    // Map abbreviations and short terms to fuller, more searchable concepts
-    // Format: abbreviation/shorthand → expanded concept(s)
-    private static final Map<String, String> CONCEPT_EXPANSIONS = buildConceptMap();
+    private static final Set<String> WEAK_STOPWORDS = Set.of(
+            "i", "me", "my", "we", "you", "your", "he", "she", "it",
+            "a", "an", "the",
+            "is", "am", "are", "was", "were",
+            "to", "for", "of", "in", "on", "at",
+            "can", "could", "should", "would",
+            "please");
 
-    // Learning intent keywords that trigger addition of tutorial/guide keywords
-    private static final Set<String> LEARNING_INTENTS = buildLearningIntents();
+    private static final Set<String> PRESERVED_PHRASES = Set.of(
+            "data structures",
+            "machine learning",
+            "operating system",
+            "artificial intelligence");
+
+    private static final Set<String> IMPORTANT_KEYWORDS = Set.of(
+            "data", "structures", "algorithms", "dsa",
+            "machine", "learning", "ai", "ml",
+            "operating", "system", "os",
+            "database", "dbms",
+            "python", "java", "c++",
+            "tutorial", "course", "guide", "beginner", "advanced");
+
+    private static final Set<String> SECONDARY_INTENT_KEYWORDS = Set.of(
+            "learn", "study", "tutorial", "course", "guide", "beginner", "beginners", "advanced");
+
+    private static final Set<String> SEARCH_QUALIFIER_KEYWORDS = Set.of(
+            "tutorial", "course", "guide", "beginner", "advanced");
+
+    private static final Map<String, String> QUERY_EXPANSIONS = Map.of(
+            "dsa", "data structures algorithms",
+            "os", "operating system",
+            "dbms", "database management system",
+            "ai", "artificial intelligence",
+            "ml", "machine learning");
 
     private QueryProcessor() {
     }
 
-    private static Map<String, String> buildConceptMap() {
-        Map<String, String> map = new HashMap<>();
-        map.put("dsa", "data structures algorithms");
-        map.put("ds", "data structures");
-        map.put("algo", "algorithms");
-        map.put("ai", "artificial intelligence");
-        map.put("ml", "machine learning");
-        map.put("dl", "deep learning");
-        map.put("nlp", "natural language processing");
-        map.put("cv", "computer vision");
-        map.put("dbms", "database systems");
-        map.put("db", "database");
-        map.put("sql", "sql database");
-        map.put("nosql", "nosql database");
-        map.put("os", "operating system");
-        map.put("api", "api development");
-        map.put("rest", "rest api");
-        map.put("react", "react framework");
-        map.put("js", "javascript");
-        map.put("ts", "typescript");
-        map.put("py", "python");
-        map.put("java", "java programming");
-        map.put("cpp", "c++ programming");
-        map.put("oop", "object oriented programming");
-        map.put("fp", "functional programming");
-        map.put("git", "version control git");
-        map.put("ci", "continuous integration");
-        map.put("cd", "continuous deployment");
-        map.put("devops", "devops practices");
-        map.put("docker", "docker containerization");
-        map.put("k8s", "kubernetes orchestration");
-        map.put("aws", "amazon web services");
-        map.put("gcp", "google cloud platform");
-        map.put("azure", "microsoft azure");
-        map.put("iot", "internet of things");
-        map.put("blockchain", "blockchain technology");
-        map.put("crypto", "cryptocurrency");
-        return map;
-    }
-
-    private static Set<String> buildStopWordsSet() {
-        Set<String> stopWords = new java.util.HashSet<>();
-        // Pronouns
-        stopWords.addAll(java.util.Arrays.asList(
-                "i", "me", "my", "we", "our", "you", "your",
-                "he", "him", "his", "she", "her", "it", "its"));
-        // Question words
-        stopWords.addAll(java.util.Arrays.asList(
-                "what", "which", "who", "whom", "whose"));
-        // Verbs and modals
-        stopWords.addAll(java.util.Arrays.asList(
-                "want", "like", "need", "get", "have", "has", "do", "does", "did",
-                "would", "could", "should", "can", "will", "shall", "may", "might", "must",
-                "is", "am", "are", "was", "were", "be", "been", "being"));
-        // Articles, conjunctions, negations
-        stopWords.addAll(java.util.Arrays.asList(
-                "the", "a", "an", "and", "or", "but", "not", "no"));
-        // Prepositions
-        stopWords.addAll(java.util.Arrays.asList(
-                "in", "on", "at", "by", "for", "of", "to", "from", "with", "as"));
-        // Adverbs and other common words
-        stopWords.addAll(java.util.Arrays.asList(
-                "about", "how", "where", "when", "why",
-                "this", "that", "these", "those", "other", "another"));
-        return stopWords;
-    }
-
-    private static Set<String> buildLearningIntents() {
-        Set<String> intents = new java.util.HashSet<>();
-        intents.addAll(java.util.Arrays.asList(
-                "learn", "start", "begin", "understand", "study", "explore", "master",
-                "how", "tutorial", "guide", "introduction", "basics"));
-        return intents;
-    }
-
-    /**
-     * Normalize a query by:
-     * 1. Converting to lowercase
-     * 2. Removing stop words
-     * 3. Expanding abbreviations (dsa → data structures algorithms)
-     * 4. Adding learning keywords if intent detected (tutorial, beginner, guide)
-     *
-     * Example:
-     * Input: "i want to start dsa"
-     * Output: "data structures algorithms tutorial beginner guide"
-     */
-    public static String normalize(String query) {
-        if (query == null || query.isBlank()) {
+    public static String normalizeQuery(String query) {
+        if (query == null) {
+            logger.info("Original: null");
+            logger.info("Normalized: ");
             return "";
         }
 
-        String lower = query.toLowerCase(Locale.ROOT).trim();
-        lower = lower.replaceAll("\\s+", " "); // normalize whitespace
-
-        String[] words = lower.split("\\s+");
-        List<String> expanded = new ArrayList<>();
-
-        // Process each word: expand abbreviations, skip stop words, keep meaningful
-        // terms
-        for (String word : words) {
-            if (word.isBlank() || STOP_WORDS.contains(word)) {
-                continue;
-            }
-
-            // Check if this word should be expanded to a fuller concept
-            String expansion = CONCEPT_EXPANSIONS.get(word);
-            if (expansion != null) {
-                expanded.add(expansion);
-            } else {
-                // Keep the meaningful word as-is
-                expanded.add(word);
-            }
+        String trimmedQuery = query.trim();
+        if (shouldPreserveMeaningfulQuery(trimmedQuery)) {
+            String preserved = trimmedQuery.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+            logger.info("Original: \"{}\"", query);
+            logger.info("Normalized: \"{}\"", preserved);
+            return preserved;
         }
 
-        // Detect learning intent and add pedagogical keywords
-        if (hasLearningIntent(lower)) {
-            expanded.add("tutorial");
-            expanded.add("beginner");
-            expanded.add("guide");
+        String originalLower = query.toLowerCase(Locale.ROOT);
+        String normalizedInput = originalLower.replaceAll("\\b(i|we)\\s+want\\s+to\\b", "$1 to");
+
+        // Preserve important technical tokens with special characters before cleaning
+        String safeInput = normalizedInput
+                .replaceAll("\\bc\\+\\+\\b", "cplusplus")
+                .replaceAll("\\bc#\\b", "csharp")
+                .replaceAll("\\bf#\\b", "fsharp")
+                .replaceAll("\\bnode\\.js\\b", "nodejs")
+                .replaceAll("\\basp\\.net\\b", "aspnet");
+
+        String normalized = safeInput
+                .replaceAll("[^a-z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        String cleaned = java.util.Arrays.stream(normalized.split(" "))
+                .filter(token -> !token.isBlank())
+                .filter(token -> !WEAK_STOPWORDS.contains(token))
+                .collect(Collectors.joining(" "));
+
+        if (cleaned.isBlank()) {
+            cleaned = originalLower.trim().replaceAll("\\s+", " ");
         }
 
-        return String.join(" ", expanded).trim();
+        String result = ensurePreservedPhrases(cleaned);
+
+        logger.info("Original: \"{}\"", query);
+        logger.info("Normalized: \"{}\"", result);
+        return result;
     }
 
-    /**
-     * Extract meaningful keywords from a query.
-     * Useful for debugging or analyzing search intent.
-     */
-    public static List<String> extractKeywords(String query) {
+    private static boolean shouldPreserveMeaningfulQuery(String query) {
         if (query == null || query.isBlank()) {
+            return false;
+        }
+
+        String compact = query.replaceAll("\\s+", " ").trim();
+        if (!compact.matches("[a-zA-Z ]+")) {
+            return false;
+        }
+
+        String[] words = compact.split(" ");
+        if (words.length < 2) {
+            return false;
+        }
+
+        for (String word : words) {
+            if (!word.isBlank() && WEAK_STOPWORDS.contains(word.toLowerCase(Locale.ROOT))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static List<String> extractKeywords(String normalizedQuery) {
+        if (normalizedQuery == null || normalizedQuery.isBlank()) {
             return List.of();
         }
 
-        String lower = query.toLowerCase(Locale.ROOT).trim();
-        String[] words = lower.split("\\s+");
-        List<String> keywords = new ArrayList<>();
+        String compact = normalizedQuery.toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ")
+                .trim();
+        String[] words = compact.split(" ");
 
-        for (String word : words) {
-            if (!word.isBlank() && !STOP_WORDS.contains(word)) {
-                keywords.add(word);
+        LinkedHashSet<String> primaryKeywords = new LinkedHashSet<>();
+        LinkedHashSet<String> secondaryKeywords = new LinkedHashSet<>();
+        LinkedHashSet<String> extraKeywords = new LinkedHashSet<>();
+
+        for (int i = 0; i < words.length; i++) {
+            if (words[i].isBlank()) {
+                continue;
+            }
+
+            if (i < words.length - 1) {
+                String phrase = words[i] + " " + words[i + 1];
+                if (PRESERVED_PHRASES.contains(phrase)) {
+                    primaryKeywords.add(phrase);
+                    i++;
+                    continue;
+                }
+            }
+
+            String token = normalizeToken(words[i]);
+            if (token.isBlank()) {
+                continue;
+            }
+
+            if (isPrimaryKeyword(token)) {
+                primaryKeywords.add(token);
+            } else if (SECONDARY_INTENT_KEYWORDS.contains(token)) {
+                secondaryKeywords.add(token);
+            } else if (!WEAK_STOPWORDS.contains(token)) {
+                extraKeywords.add(token);
             }
         }
 
-        return keywords;
+        List<String> combined = new ArrayList<>(
+                primaryKeywords.size() + secondaryKeywords.size() + extraKeywords.size());
+        combined.addAll(primaryKeywords);
+        combined.addAll(secondaryKeywords);
+        combined.addAll(extraKeywords);
+        return combined;
     }
 
-    /**
-     * Check if query contains learning-related intent.
-     */
-    private static boolean hasLearningIntent(String lowerQuery) {
-        for (String intent : LEARNING_INTENTS) {
-            if (lowerQuery.contains(intent)) {
-                return true;
+    public static String buildSearchQuery(String normalizedQuery) {
+        String base = normalizedQuery == null ? "" : normalizedQuery.replaceAll("\\s+", " ").trim();
+        // Expand ambiguous queries before keyword extraction
+        if (QUERY_EXPANSIONS.containsKey(base)) {
+            base = QUERY_EXPANSIONS.get(base);
+        }
+        if (base.isBlank()) {
+            logger.info("Normalized: \"{}\"", base);
+            logger.info("Keywords: []");
+            logger.info("Final Query: \"\"");
+            return "";
+        }
+
+        List<String> keywords = extractKeywords(base);
+        List<String> primary = keywords.stream()
+                .map(QueryProcessor::normalizeToken)
+                .filter(QueryProcessor::isPrimaryKeyword)
+                .collect(Collectors.toList());
+
+        if (primary.isEmpty()) {
+            logger.info("Normalized: \"{}\"", base);
+            logger.info("Keywords: {}", keywords);
+            logger.info("Final Query: \"{}\"", base);
+            return base;
+        }
+
+        LinkedHashSet<String> finalKeywords = new LinkedHashSet<>(primary);
+
+        for (String keyword : keywords) {
+            String token = normalizeToken(keyword);
+            if (SEARCH_QUALIFIER_KEYWORDS.contains(token)) {
+                finalKeywords.add(token);
             }
         }
-        return false;
+
+        boolean hasGuideToken = finalKeywords.contains("tutorial")
+                || finalKeywords.contains("course")
+                || finalKeywords.contains("guide");
+        if (!hasGuideToken) {
+            finalKeywords.add("tutorial");
+        }
+
+        String finalQuery = String.join(" ", finalKeywords);
+
+        logger.info("Normalized: \"{}\"", base);
+        logger.info("Keywords: {}", keywords);
+        logger.info("Final Query: \"{}\"", finalQuery);
+        return finalQuery;
+    }
+
+    private static String ensurePreservedPhrases(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+
+        String normalizedValue = value.replaceAll("\\s+", " ").trim();
+        for (String phrase : PRESERVED_PHRASES) {
+            if (normalizedValue.contains(phrase)) {
+                return normalizedValue;
+            }
+        }
+
+        return normalizedValue;
+    }
+
+    private static String normalizeToken(String token) {
+        if (token == null) {
+            return "";
+        }
+
+        String normalized = token.trim().toLowerCase(Locale.ROOT);
+        if ("beginners".equals(normalized)) {
+            return "beginner";
+        }
+        return normalized;
+    }
+
+    private static boolean isPrimaryKeyword(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+
+        if (PRESERVED_PHRASES.contains(token)) {
+            return true;
+        }
+
+        if (!IMPORTANT_KEYWORDS.contains(token)) {
+            return false;
+        }
+
+        return !SEARCH_QUALIFIER_KEYWORDS.contains(token);
     }
 }
