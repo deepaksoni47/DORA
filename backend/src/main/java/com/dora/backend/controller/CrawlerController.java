@@ -23,4 +23,16 @@ public class CrawlerController {
         crawlerService.crawlPage(request.getUrl(), request.getMaxDepth(), request.getMaxPages());
         return Map.of("message", "Page crawled successfully");
     }
+
+    @PostMapping("/academic")
+    public Map<String, Object> crawlAcademicSources(@RequestBody(required = false) CrawlerRequest request) {
+        Integer maxDepth = request == null ? null : request.getMaxDepth();
+        Integer maxPages = request == null ? null : request.getMaxPages();
+        int crawledSeeds = crawlerService.crawlAcademicSources(maxDepth, maxPages);
+
+        return Map.of(
+                "message", "Academic seed crawling completed",
+                "seedCount", crawlerService.getAcademicSeedUrls().size(),
+                "successfulSeeds", crawledSeeds);
+    }
 }

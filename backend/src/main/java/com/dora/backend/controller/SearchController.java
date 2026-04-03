@@ -22,12 +22,13 @@ public class SearchController {
     public List<Document> search(
             @RequestParam(value = "q", required = false) String query,
             @RequestParam(value = "source", required = false) String source,
+            @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size) {
         if (query == null || query.trim().isEmpty()) {
             throw new IllegalArgumentException("Invalid query parameter");
         }
 
-        return searchService.search(query, source, page, size);
+        return searchService.search(query, source, type, page, size);
     }
 }

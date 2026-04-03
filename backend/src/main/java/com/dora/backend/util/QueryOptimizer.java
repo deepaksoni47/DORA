@@ -28,9 +28,9 @@ public class QueryOptimizer {
         String baseQuery = extractBaseQuery(safeFinalQuery);
 
         Map<String, String> apiQueries = new HashMap<>();
-        apiQueries.put("youtube", safeFinalQuery);
+        apiQueries.put("youtube", appendMissingTokens(baseQuery, "tutorial"));
 
-        String githubQuery = baseQuery.trim();
+        String githubQuery = buildGitHubQuery(baseQuery);
         apiQueries.put("github", githubQuery);
 
         // Wikipedia: expand if ambiguous, else use baseQuery
@@ -72,13 +72,28 @@ public class QueryOptimizer {
         return base.isBlank() ? finalQuery : base;
     }
 
-    private String appendIfMissing(String baseQuery, String suffix) {
+    private String buildGitHubQuery(String baseQuery) {
         if (baseQuery == null || baseQuery.isBlank()) {
-            return suffix;
+            return "";
         }
-        if (baseQuery.contains(suffix)) {
-            return baseQuery;
+
+        return baseQuery.trim() + " fork:false archived:false";
+    }
+
+    private String appendMissingTokens(String baseQuery, String... suffixTokens) {
+        String value = baseQuery == null ? "" : baseQuery.trim();
+        for (String suffixToken : suffixTokens) {
+            if (suffixToken == null || suffixToken.isBlank()) {
+                continue;
+            }
+
+            if (!value.contains(suffixToken)) {
+                value = value.isBlank() ? suffixToken : value + " " + suffixToken;
+            }
         }
-        return baseQuery + " " + suffix;
+
+        return value;
     }
 }
+
+

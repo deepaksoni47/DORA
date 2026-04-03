@@ -59,7 +59,7 @@ class SearchServiceTest {
 
         when(documentRepository.findAll(any(Specification.class))).thenReturn(List.of(descriptionMatch, titleMatch));
         when(youTubeApiService.searchYouTube(eq("data structures tutorial"))).thenReturn(List.of());
-        when(gitHubApiService.searchRepositories(eq("data structures"))).thenReturn(List.of());
+        when(gitHubApiService.searchRepositories(eq("data structures fork:false archived:false"))).thenReturn(List.of());
         when(wikipediaService.searchConcept(eq("data structures"))).thenReturn(List.of());
         when(arxivApiService.searchPapers(eq("data structures"))).thenReturn(List.of());
 
@@ -68,7 +68,7 @@ class SearchServiceTest {
         assertThat(results).containsExactly(titleMatch, descriptionMatch);
         assertThat(titleMatch.getScore()).isGreaterThan(descriptionMatch.getScore());
         verify(youTubeApiService, atLeastOnce()).searchYouTube("data structures tutorial");
-        verify(gitHubApiService, atLeastOnce()).searchRepositories("data structures");
+        verify(gitHubApiService, atLeastOnce()).searchRepositories("data structures fork:false archived:false");
         verify(wikipediaService, atLeastOnce()).searchConcept("data structures");
         verify(arxivApiService, atLeastOnce()).searchPapers("data structures");
     }
@@ -94,3 +94,4 @@ class SearchServiceTest {
         verify(arxivApiService, never()).searchPapers(any());
     }
 }
+

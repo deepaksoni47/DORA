@@ -3,6 +3,7 @@ package com.dora.backend.service;
 import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
 import com.dora.backend.repository.DocumentSpecifications;
+import com.dora.backend.util.AcademicSubjectClassifier;
 import com.dora.backend.util.QueryOptimizer;
 import com.dora.backend.util.QueryProcessor;
 import java.util.ArrayList;
@@ -54,10 +55,11 @@ public class SearchService {
         this.queryOptimizer = queryOptimizer;
     }
 
-    public List<Document> search(String query, String source, int page, int size) {
+    public List<Document> search(String query, String source, String type, int page, int size) {
         String normalizedQuery = normalizeQuery(query);
         String finalQuery = QueryProcessor.buildSearchQuery(normalizedQuery);
         String normalizedSource = normalize(source);
+        String normalizedType = normalize(type);
 
         logger.info("Normalized query: {}", normalizedQuery);
         logger.info("Final query: {}", finalQuery);
@@ -139,17 +141,19 @@ public class SearchService {
 
         applyFallbackSearch(query, finalQuery, crawlerQuery, deduplicatedResults);
 
-        List<Document> rankedResults = rankAndSort(deduplicatedResults, rankingKeywords, words);
-        List<Document> diverseResults = applySourceDiversity(rankedResults, 5, 20);
-        List<Document> filteredResults = applySourceFilter(diverseResults, normalizedSource);
+        List<Document> rankedResults = rankAndSort(deduplicatedResults, rankingKeywords, words, finalQuery);
+        List<Document> diverseResults = applySourceDiversity(rankedResults, 2, 10);
+        List<Document> sourceFilteredResults = applySourceFilter(diverseResults, normalizedSource);
+        List<Document> filteredResults = applyTypeFilter(sourceFilteredResults, normalizedType);
 
         logger.info(
-                "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}'",
+                "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}' | type='{}'",
                 finalQuery,
                 safePage,
                 safeSize,
                 filteredResults.size(),
-                normalizedSource);
+                normalizedSource,
+                normalizedType);
 
         List<Document> paginatedResults = paginate(filteredResults, safePage, safeSize);
         logger.info("Returned: {}", paginatedResults.size());
@@ -283,6 +287,22 @@ public class SearchService {
                 .collect(Collectors.toList());
     }
 
+    private List<Document> applyTypeFilter(List<Document> results, String type) {
+        if (!isPresent(type)) {
+            return results;
+        }
+        
+        List<String> types = Arrays.asList(type.toLowerCase().split(","));
+        
+        return results.stream()
+                .filter(document -> {
+                    if (!isPresent(document.getType())) return false;
+                    String docType = document.getType().toLowerCase();
+                    return types.contains(docType);
+                })
+                .collect(Collectors.toList());
+    }
+
     private List<Document> paginate(List<Document> results, int page, int size) {
         int start = page * size;
         if (start >= results.size()) {
@@ -312,22 +332,25 @@ public class SearchService {
         return results == null ? Collections.emptyList() : results;
     }
 
-    private List<Document> rankAndSort(List<Document> results, List<String> keywords, String[] words) {
+    private List<Document> rankAndSort(List<Document> results, List<String> keywords, String[] words, String query) {
         Set<String> ignoreWords = Set.of("tutorial", "guide", "course", "learn");
         String[] filteredWords = Arrays.stream(words)
                 .filter(word -> !ignoreWords.contains(word.toLowerCase()))
                 .toArray(String[]::new);
+        Set<String> subjects = AcademicSubjectClassifier.detectSubjects(query);
 
         return results.stream()
                 .peek(document -> {
                     double baseScore = getScoreValue(document);
                     double score = baseScore
                             + rankingService.calculateScore(document, keywords)
-                            + calculateKeywordBoost(document, filteredWords);
+                            + calculateKeywordBoost(document, filteredWords)
+                            + AcademicSubjectClassifier.calculateSourceWeight(document, subjects);
                     document.setScore(score);
                     logger.debug(
-                            "Ranking result | keywords={} | source='{}' | title='{}' | score={} ",
+                            "Ranking result | keywords={} | subjects={} | source='{}' | title='{}' | score={} ",
                             keywords,
+                            subjects,
                             document.getSource(),
                             document.getTitle(),
                             score);
@@ -347,7 +370,6 @@ public class SearchService {
 
         Map<String, Integer> sourceCount = new HashMap<>();
         List<Document> diverseResults = new ArrayList<>();
-        Set<Document> addedDocs = new HashSet<>();
 
         for (Document doc : rankedResults) {
             if (diverseResults.size() >= topResultsLimit) {
@@ -359,13 +381,20 @@ public class SearchService {
 
             if (count < maxPerSource) {
                 diverseResults.add(doc);
-                addedDocs.add(doc);
                 sourceCount.put(resultSource, count + 1);
             }
         }
 
+        if (diverseResults.size() >= topResultsLimit) {
+            return diverseResults;
+        }
+
         for (Document doc : rankedResults) {
-            if (!addedDocs.contains(doc)) {
+            if (diverseResults.size() >= topResultsLimit) {
+                break;
+            }
+
+            if (!diverseResults.contains(doc)) {
                 diverseResults.add(doc);
             }
         }
