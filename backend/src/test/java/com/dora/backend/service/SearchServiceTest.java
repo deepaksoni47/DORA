@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.dora.backend.entity.Document;
 import com.dora.backend.repository.DocumentRepository;
 import com.dora.backend.util.QueryOptimizer;
+import com.dora.backend.dto.SearchResponse;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +64,8 @@ class SearchServiceTest {
         when(wikipediaService.searchConcept(eq("data structures"))).thenReturn(List.of());
         when(arxivApiService.searchPapers(eq("data structures"))).thenReturn(List.of());
 
-        List<Document> results = searchService.search("I want to learn data structures", null, null, 0, 10);
+        SearchResponse response = searchService.search("I want to learn data structures", null, null, null, 0, 10);
+        List<Document> results = response.getResults();
 
         assertThat(results).containsExactly(titleMatch, descriptionMatch);
         assertThat(titleMatch.getScore()).isGreaterThan(descriptionMatch.getScore());
@@ -84,7 +86,8 @@ class SearchServiceTest {
                 new RankingService(),
                 new QueryOptimizer());
 
-        List<Document> results = searchService.search(null, null, null, 0, 10);
+        SearchResponse response = searchService.search(null, null, null, null, 0, 10);
+        List<Document> results = response.getResults();
 
         assertThat(results).isEmpty();
         verify(documentRepository, never()).findAll(any(Specification.class));

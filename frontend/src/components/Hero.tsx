@@ -81,7 +81,7 @@ export default function Hero() {
       <div className="relative z-10 flex flex-col items-center w-full max-w-4xl">
         {/* Logo Element */}
         <div ref={logoWrapperRef} className="mb-6 md:mb-8">
-          <LogoDora isSearchFocused={isSearchFocused} />
+          <LogoDora />
         </div>
 
         {/* Heading Element */}
@@ -89,7 +89,7 @@ export default function Hero() {
           ref={headingRef}
           className="max-w-2xl text-base sm:text-lg md:text-[1.45rem] text-theme-text/75 font-serif italic mb-10 md:mb-14 tracking-[0.08em] text-center drop-shadow-[0_4px_14px_rgba(255,248,235,0.45)]"
         >
-          Explore Knowledge Differently
+          DORA — Explore Knowledge Differently
         </h1>
 
         {/* Interactive Search Bar */}
@@ -99,23 +99,25 @@ export default function Hero() {
       </div>
 
       {/* Scroll Hint */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center opacity-50 animate-bounce cursor-default select-none hidden sm:flex">
-        <span className="text-[10px] uppercase tracking-widest text-theme-muted mb-2 font-medium">
-          Scroll to discover
-        </span>
-        <svg
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth="1.5"
-          stroke="currentColor"
-          className="w-4 h-4 text-theme-muted"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-          />
-        </svg>
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center opacity-50 cursor-default select-none hidden sm:flex z-20">
+        <div className="flex flex-col items-center animate-bounce">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-theme-muted mb-2 font-medium whitespace-nowrap text-center ml-[0.2em]">
+            Scroll to discover
+          </span>
+          <svg
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth="1.5"
+            stroke="currentColor"
+            className="w-4 h-4 text-theme-muted"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+            />
+          </svg>
+        </div>
       </div>
     </section>
   );

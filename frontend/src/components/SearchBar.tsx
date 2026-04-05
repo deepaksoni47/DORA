@@ -62,9 +62,9 @@ export default function SearchBar({
       scale: compact ? 1.015 : 1.025,
       y: -2,
       boxShadow:
-        "0 24px 55px -24px rgba(88, 57, 22, 0.45), inset 0 1px 0 rgba(255,255,255,0.82), inset 0 -10px 18px rgba(183, 131, 66, 0.12)",
-      borderColor: "rgba(202, 154, 91, 0.95)",
-      backgroundColor: "rgba(251, 243, 229, 0.97)",
+        "0 0 0 4px rgba(202, 154, 91, 0.25), 0 24px 55px -24px rgba(88, 57, 22, 0.45), inset 0 1px 0 rgba(255,255,255,0.82), inset 0 -10px 18px rgba(183, 131, 66, 0.12)",
+      borderColor: "rgba(202, 154, 91, 1)",
+      backgroundColor: "rgba(251, 243, 229, 0.99)",
       duration: 0.3,
       ease: "power2.out"
     });
@@ -79,7 +79,7 @@ export default function SearchBar({
         "0 18px 42px -24px rgba(88, 57, 22, 0.32), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -12px 22px rgba(191, 145, 82, 0.12)",
       borderColor: "rgba(202, 154, 91, 0.68)",
       backgroundColor: "rgba(248, 239, 224, 0.94)",
-      duration: 0.3,
+      duration: 0.4,
       ease: "power2.out"
     });
   };

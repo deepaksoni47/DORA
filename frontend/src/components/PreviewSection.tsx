@@ -30,8 +30,11 @@ export default function PreviewSection() {
   useEffect(() => {
     if (!sectionRef.current || !listRef.current || !headerRef.current) return;
     
-    // Background transition
-    gsap.fromTo(sectionRef.current,
+    // Explicitly register ScrollTrigger
+    gsap.registerPlugin(ScrollTrigger);
+    
+    // Background transition - removed 'transition-colors' from element to avoid conflict
+    const bgAnim = gsap.fromTo(sectionRef.current,
       { backgroundColor: "transparent" },
       {
         backgroundColor: "#fdfbf7",
@@ -41,13 +44,15 @@ export default function PreviewSection() {
           start: "top 90%",
           end: "top 40%",
           scrub: true,
-        }
+          invalidateOnRefresh: true,
+        },
+        force3D: true, // Hardware acceleration
       }
     );
 
     // Staggered reveal for header elements
     const headerChildren = headerRef.current.children;
-    gsap.fromTo(headerChildren,
+    const headerAnim = gsap.fromTo(headerChildren,
       { opacity: 0, y: 30 },
       {
         opacity: 1,
@@ -58,13 +63,15 @@ export default function PreviewSection() {
         scrollTrigger: {
           trigger: headerRef.current,
           start: "top 85%",
-        }
+          toggleActions: "play none none none",
+        },
+        force3D: true,
       }
     );
 
     // Staggered reveal for cards
     const cards = listRef.current.querySelectorAll('.result-card');
-    gsap.fromTo(cards,
+    const cardsAnim = gsap.fromTo(cards,
       { opacity: 0, y: 50 },
       {
         opacity: 1,
@@ -75,15 +82,30 @@ export default function PreviewSection() {
         scrollTrigger: {
           trigger: listRef.current,
           start: "top 75%",
-        }
+          toggleActions: "play none none none",
+        },
+        force3D: true,
       }
     );
+
+    // Cleanup animations properly
+    return () => {
+      bgAnim.kill();
+      headerAnim.kill();
+      cardsAnim.kill();
+      ScrollTrigger.getAll().forEach(st => {
+        if (st.trigger === sectionRef.current) st.kill();
+      });
+    };
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative w-full pt-48 pb-40 flex flex-col items-center transition-colors">
+    <section 
+      ref={sectionRef} 
+      className="relative w-full pt-48 pb-40 flex flex-col items-center will-change-[background-color]"
+    >
       <div className="w-full max-w-4xl px-6">
-        <div ref={headerRef} className="text-center mb-20 space-y-4">
+        <div ref={headerRef} className="text-center mb-20 space-y-4 will-change-[transform,opacity]">
           <p className="text-xs uppercase tracking-[0.4em] text-theme-muted font-medium ml-1">
             DORA Intelligence Preview
           </p>

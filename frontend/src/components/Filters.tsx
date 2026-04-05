@@ -1,10 +1,36 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import gsap from "gsap";
+import { cn } from "@/lib/utils";
+
+const FILTER_CONFIG = {
+  type: [
+    { label: "Research Papers", value: "paper" },
+    { label: "Video Lectures", value: "video" },
+    { label: "Code Repositories", value: "repository" },
+    { label: "Articles & Blogs", value: "article,blog,book" },
+  ],
+  source: [
+    { label: "ArXiv", value: "arxiv" },
+    { label: "GitHub", value: "github" },
+    { label: "YouTube", value: "youtube" },
+    { label: "Wikipedia", value: "wikipedia" },
+    { label: "Internal Crawler", value: "crawler" },
+  ],
+  years: [
+    { label: "2024", value: "2024-2024" },
+    { label: "2023", value: "2023-2023" },
+    { label: "2022 & Older", value: "0-2022" },
+  ]
+};
 
 export default function Filters() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     gsap.fromTo(containerRef.current, 
@@ -13,35 +39,100 @@ export default function Filters() {
     );
   }, []);
 
+  const updateFilters = useCallback((key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const currentValues = params.get(key)?.split(",") || [];
+    
+    // Support multi-value filters (e.g. "article,blog")
+    const parts = value.split(",");
+    const isAlreadyFullyChecked = parts.every(v => currentValues.includes(v));
+    
+    if (isAlreadyFullyChecked) {
+      // Remove all parts from the current values
+      const newValues = currentValues.filter((v) => !parts.includes(v));
+      if (newValues.length > 0) {
+        params.set(key, newValues.join(","));
+      } else {
+        params.delete(key);
+      }
+    } else {
+      // Add all parts that aren't already there
+      const resultValues = [...currentValues];
+      parts.forEach(v => {
+        if (!resultValues.includes(v)) {
+          resultValues.push(v);
+        }
+      });
+      params.set(key, resultValues.join(","));
+    }
+    
+    // Always reset page when filters change
+    params.delete("page");
+    
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  const isChecked = (key: string, value: string) => {
+    const currentValues = searchParams.get(key)?.split(",") || [];
+    if (!value) return false;
+    
+    const parts = value.split(",");
+    // For multi-value filters, return true if ALL parts are included
+    return parts.every(v => currentValues.includes(v));
+  };
+
   return (
     <aside 
       ref={containerRef}
       className="hidden md:block w-64 shrink-0 sticky top-32 self-start bg-white/40 backdrop-blur-md border border-white/30 rounded-[20px] p-5 mr-8 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)]"
     >
-      <h3 className="text-sm font-semibold tracking-wider text-theme-muted uppercase mb-6">Filters</h3>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-sm font-semibold tracking-wider text-theme-muted uppercase">Filters</h3>
+        {searchParams.toString().includes("=") && (
+          <button 
+            onClick={() => router.push(pathname)}
+            className="text-[10px] text-theme-accent hover:underline uppercase tracking-tighter"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
       
       <FilterSection title="Type" defaultOpen>
-        <FilterCheckbox label="Research Papers" count={124} />
-        <FilterCheckbox label="Video Lectures" count={42} />
-        <FilterCheckbox label="Code Repositories" count={18} />
-        <FilterCheckbox label="Articles" count={89} />
+        {FILTER_CONFIG.type.map((f) => (
+          <FilterCheckbox 
+            key={f.value} 
+            label={f.label} 
+            checked={isChecked("type", f.value)}
+            onChange={() => updateFilters("type", f.value)}
+          />
+        ))}
       </FilterSection>
 
       <div className="h-px bg-black/5 my-4" />
 
       <FilterSection title="Source" defaultOpen={false}>
-        <FilterCheckbox label="ArXiv" />
-        <FilterCheckbox label="GitHub" />
-        <FilterCheckbox label="YouTube" />
-        <FilterCheckbox label="Medium" />
+        {FILTER_CONFIG.source.map((f) => (
+          <FilterCheckbox 
+            key={f.value} 
+            label={f.label} 
+            checked={isChecked("source", f.value)}
+            onChange={() => updateFilters("source", f.value)}
+          />
+        ))}
       </FilterSection>
 
       <div className="h-px bg-black/5 my-4" />
 
       <FilterSection title="Year" defaultOpen={false}>
-        <FilterCheckbox label="2024" />
-        <FilterCheckbox label="2023" />
-        <FilterCheckbox label="2022 & Older" />
+        {FILTER_CONFIG.years.map((f) => (
+          <FilterCheckbox 
+            key={f.value} 
+            label={f.label} 
+            checked={isChecked("years", f.value)}
+            onChange={() => updateFilters("years", f.value)}
+          />
+        ))}
       </FilterSection>
     </aside>
   );
@@ -64,9 +155,9 @@ function FilterSection({ title, children, defaultOpen = true }: { title: string,
     <div className="mb-2">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between text-theme-text font-medium py-2 outline-none"
+        className="w-full flex items-center justify-between text-theme-text font-medium py-2 outline-none group"
       >
-        <span>{title}</span>
+        <span className="group-hover:text-theme-accent transition-colors">{title}</span>
         <svg 
           className={`w-4 h-4 text-theme-muted transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -83,18 +174,35 @@ function FilterSection({ title, children, defaultOpen = true }: { title: string,
   );
 }
 
-function FilterCheckbox({ label, count }: { label: string, count?: number }) {
+function FilterCheckbox({ label, checked, onChange }: { label: string, checked: boolean, onChange: () => void }) {
   return (
-    <label className="flex items-center justify-between group cursor-pointer">
+    <label className="flex items-center justify-between group cursor-pointer select-none">
       <div className="flex items-center">
-        <div className="w-4 h-4 rounded border border-theme-muted/40 flex items-center justify-center mr-3 transition-colors group-hover:border-theme-accent">
-          {/* subtle checkmark placeholder */}
+        <div className={cn(
+          "w-4 h-4 rounded border flex items-center justify-center mr-3 transition-all duration-300",
+          checked 
+            ? "border-theme-accent bg-theme-accent text-white shadow-[0_0_10px_rgba(202,154,91,0.3)]" 
+            : "border-theme-muted/40 group-hover:border-theme-accent"
+        )}>
+          {checked && (
+            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          <input 
+            type="checkbox" 
+            className="hidden" 
+            checked={checked} 
+            onChange={onChange} 
+          />
         </div>
-        <span className="text-sm text-theme-muted group-hover:text-theme-text transition-colors">{label}</span>
+        <span className={cn(
+          "text-sm transition-colors duration-300",
+          checked ? "text-theme-text font-medium" : "text-theme-muted group-hover:text-theme-text"
+        )}>
+          {label}
+        </span>
       </div>
-      {count !== undefined && (
-        <span className="text-xs text-theme-muted/60">{count}</span>
-      )}
     </label>
   );
 }

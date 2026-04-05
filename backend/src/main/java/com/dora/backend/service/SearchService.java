@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import com.dora.backend.dto.SearchResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -55,7 +56,7 @@ public class SearchService {
         this.queryOptimizer = queryOptimizer;
     }
 
-    public List<Document> search(String query, String source, String type, int page, int size) {
+    public SearchResponse search(String query, String source, String type, String years, int page, int size) {
         String normalizedQuery = normalizeQuery(query);
         String finalQuery = QueryProcessor.buildSearchQuery(normalizedQuery);
         String normalizedSource = normalize(source);
@@ -65,7 +66,12 @@ public class SearchService {
         logger.info("Final query: {}", finalQuery);
 
         if (!isPresent(finalQuery)) {
-            return List.of();
+            return SearchResponse.builder()
+                    .results(List.of())
+                    .totalResults(0)
+                    .page(page)
+                    .size(size)
+                    .build();
         }
 
         Map<String, String> apiQueries = queryOptimizer.buildApiQueries(finalQuery);
@@ -142,22 +148,31 @@ public class SearchService {
         applyFallbackSearch(query, finalQuery, crawlerQuery, deduplicatedResults);
 
         List<Document> rankedResults = rankAndSort(deduplicatedResults, rankingKeywords, words, finalQuery);
-        List<Document> diverseResults = applySourceDiversity(rankedResults, 2, 10);
+        // Increase limit from 10 to 100 to allow pagination over more results
+        List<Document> diverseResults = applySourceDiversity(rankedResults, 2, 100);
         List<Document> sourceFilteredResults = applySourceFilter(diverseResults, normalizedSource);
-        List<Document> filteredResults = applyTypeFilter(sourceFilteredResults, normalizedType);
+        List<Document> typeFilteredResults = applyTypeFilter(sourceFilteredResults, normalizedType);
+        List<Document> filteredResults = applyYearFilter(typeFilteredResults, years);
 
         logger.info(
-                "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}' | type='{}'",
+                "Search request | query='{}' | page={} | size={} | totalResults={} | source='{}' | type='{}' | years='{}'",
                 finalQuery,
                 safePage,
                 safeSize,
                 filteredResults.size(),
                 normalizedSource,
-                normalizedType);
+                normalizedType,
+                years);
 
         List<Document> paginatedResults = paginate(filteredResults, safePage, safeSize);
         logger.info("Returned: {}", paginatedResults.size());
-        return paginatedResults;
+
+        return SearchResponse.builder()
+                .results(paginatedResults)
+                .totalResults(filteredResults.size())
+                .page(safePage)
+                .size(safeSize)
+                .build();
     }
 
     private double getScoreValue(Document document) {
@@ -282,8 +297,9 @@ public class SearchService {
             return results;
         }
 
+        List<String> sources = Arrays.asList(source.toLowerCase().split(","));
         return results.stream()
-                .filter(document -> isPresent(document.getSource()) && document.getSource().equalsIgnoreCase(source))
+                .filter(document -> isPresent(document.getSource()) && sources.contains(document.getSource().toLowerCase()))
                 .collect(Collectors.toList());
     }
 
@@ -291,16 +307,34 @@ public class SearchService {
         if (!isPresent(type)) {
             return results;
         }
-        
+
         List<String> types = Arrays.asList(type.toLowerCase().split(","));
-        
         return results.stream()
-                .filter(document -> {
-                    if (!isPresent(document.getType())) return false;
-                    String docType = document.getType().toLowerCase();
-                    return types.contains(docType);
-                })
+                .filter(document -> isPresent(document.getType()) && types.contains(document.getType().toLowerCase()))
                 .collect(Collectors.toList());
+    }
+
+    private List<Document> applyYearFilter(List<Document> results, String years) {
+        if (!isPresent(years)) {
+            return results;
+        }
+
+        try {
+            String[] parts = years.split("-");
+            int startYear = Integer.parseInt(parts[0]);
+            int endYear = parts.length > 1 ? Integer.parseInt(parts[1]) : startYear;
+
+            return results.stream()
+                    .filter(document -> {
+                        Integer year = document.getYear();
+                        if (year == null) return false;
+                        return year >= startYear && year <= endYear;
+                    })
+                    .collect(Collectors.toList());
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid year format: {}", years);
+            return results;
+        }
     }
 
     private List<Document> paginate(List<Document> results, int page, int size) {

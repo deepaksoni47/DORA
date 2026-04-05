@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import gsap from "gsap";
 import ResultCard, { ResultItem } from "./ResultCard";
+import Pagination from "./Pagination";
 
 interface ResultsListProps {
   activeCategory: string;
@@ -10,8 +12,12 @@ interface ResultsListProps {
 }
 
 export default function ResultsList({ activeCategory, searchQuery }: ResultsListProps) {
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [results, setResults] = useState<ResultItem[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const pageSize = 10;
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,18 +25,32 @@ export default function ResultsList({ activeCategory, searchQuery }: ResultsList
     setIsLoading(true);
     setResults([]);
     
-    let typeParam = "";
-    if (activeCategory === "Papers") typeParam = "paper";
-    else if (activeCategory === "Videos") typeParam = "video";
-    else if (activeCategory === "Resources") typeParam = "article,blog,book,course,repository,reference,concept";
+    const sourceParam = searchParams.get("source") || "";
+    const yearsParam = searchParams.get("years") || "";
+    const typeFilters = searchParams.get("type") || "";
+    
+    let baseType = "";
+    if (activeCategory === "Papers") baseType = "paper";
+    else if (activeCategory === "Videos") baseType = "video";
+    else if (activeCategory === "Resources") baseType = "article,blog,book,course,repository,reference,concept";
+    
+    // Combine Tab categories with Sidebar filters
+    const combinedTypes = [baseType, typeFilters].filter(Boolean).sort().join(",");
     
     const formattedQuery = searchQuery?.trim() || "machine learning";
-    const fetchUrl = `/api/search?q=${encodeURIComponent(formattedQuery)}${typeParam ? `&type=${typeParam}` : ""}`;
+    const fetchUrl = `/api/search?q=${encodeURIComponent(formattedQuery)}${combinedTypes ? `&type=${combinedTypes}` : ""}${sourceParam ? `&source=${sourceParam}` : ""}${yearsParam ? `&years=${yearsParam}` : ""}&page=${currentPage}&size=${pageSize}`;
     
     fetch(fetchUrl, { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
-        setResults(data);
+        // Handle new response format { results: [], totalResults: X }
+        if (data && data.results) {
+          setResults(data.results);
+          setTotalResults(data.totalResults || 0);
+        } else {
+          setResults(Array.isArray(data) ? data : []);
+          setTotalResults(Array.isArray(data) ? data.length : 0);
+        }
         setIsLoading(false);
       })
       .catch(err => {
@@ -40,7 +60,12 @@ export default function ResultsList({ activeCategory, searchQuery }: ResultsList
       });
 
     return () => controller.abort();
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, currentPage, searchParams]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     if (!isLoading && results.length > 0 && listRef.current) {
@@ -89,6 +114,13 @@ export default function ResultsList({ activeCategory, searchQuery }: ResultsList
       {results.map((item) => (
         <ResultCard key={item.id} item={item} />
       ))}
+      
+      <Pagination 
+        currentPage={currentPage}
+        totalResults={totalResults}
+        pageSize={pageSize}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 }

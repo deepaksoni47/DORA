@@ -1,70 +1,44 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
-
-export default function LogoDora({ isSearchFocused }: { isSearchFocused: boolean }) {
-  const oRef = useRef<SVGSVGElement>(null);
-  
-  useEffect(() => {
-    if (!oRef.current) return;
-    
-    // Idle pulse animation
-    const idleAnim = gsap.to(oRef.current, {
-      scale: 1.05,
-      duration: 3,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-      paused: isSearchFocused
-    });
-    
-    if (isSearchFocused) {
-      idleAnim.pause();
-      gsap.to(oRef.current, {
-        scale: 1.25,
-        rotation: 10,
-        duration: 0.4,
-        ease: "power2.out",
-        color: "#ca9a5b", // subtle highlight
-      });
-    } else {
-      gsap.to(oRef.current, {
-        scale: 1,
-        rotation: 0,
-        duration: 0.5,
-        ease: "power2.out",
-        color: "currentColor",
-        onComplete: () => { idleAnim.play(); }
-      });
-    }
-
-    return () => {
-      idleAnim.kill();
-    };
-  }, [isSearchFocused]);
-
+export default function LogoDora() {
   return (
-    <div className="flex items-center text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-light tracking-[0.16em] text-theme-text opacity-95 select-none">
-      <span className="drop-shadow-[0_10px_20px_rgba(255,255,255,0.18)]">D</span>
-      <span className="flex items-center justify-center mx-[0.02em] md:mx-[0.04em] text-[0.9em] text-theme-accent drop-shadow-[0_8px_20px_rgba(202,154,91,0.18)]">
+    <div className="flex items-center text-7xl sm:text-8xl md:text-9xl font-serif tracking-[0.12em] text-theme-text select-none group">
+      <span className="drop-shadow-[0_8px_16px_rgba(42,42,42,0.12)]">D</span>
+      <span className="relative flex items-center justify-center ml-[-0.08em] mr-[0.04em] text-[0.82em]">
+        {/* Layered Glass-Effect Magnifying Glass */}
         <svg
-          ref={oRef}
-          width="1em"
-          height="1em"
+          width="1.1em"
+          height="1.1em"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.2"
+          strokeWidth="1.1"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="will-change-transform transform-gpu"
+          className="text-theme-accent will-change-transform transform-gpu drop-shadow-[0_12px_24px_rgba(202,154,91,0.22)]"
         >
-          <circle cx="14" cy="10" r="7" />
-          <line x1="3" y1="21" x2="9" y2="15" />
+          {/* Subtle Lens Gradient Overlay (Internal) */}
+          <defs>
+            <radialGradient id="glassGradient" cx="50%" cy="50%" r="50%" fx="35%" fy="35%">
+              <stop offset="0%" stopColor="white" stopOpacity="0.45" />
+              <stop offset="60%" stopColor="white" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="white" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          
+          {/* Magnifying Glass Lens & Rim */}
+          <circle cx="11" cy="11" r="7.5" strokeWidth="1.4" className="opacity-90" />
+          <circle cx="11" cy="11" r="6" fill="url(#glassGradient)" stroke="none" className="opacity-70" />
+          
+          {/* Inner details for depth */}
+          <path d="M11 5.5 A5.5 5.5 0 0 1 16.5 11" className="opacity-40" strokeWidth="0.8" />
+          
+          {/* Sophisticated Handle */}
+          <line x1="16.5" y1="16.5" x2="21" y2="21" strokeWidth="1.8" className="opacity-95" />
+          <path d="M16 16 L17.5 17.5" stroke="#fff" strokeWidth="0.5" className="opacity-40" />
         </svg>
       </span>
-      <span className="drop-shadow-[0_10px_20px_rgba(255,255,255,0.18)]">RA</span>
+      <span className="drop-shadow-[0_8px_16px_rgba(42,42,42,0.12)] ml-[-0.08em]">RA</span>
     </div>
   );
 }

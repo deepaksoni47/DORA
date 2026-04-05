@@ -33,7 +33,7 @@ export default function ResultCard({ item }: { item: ResultItem }) {
       href={item.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="result-card block relative z-0 opacity-0 w-full p-6 rounded-[16px] bg-white/60 hover:bg-white/80 backdrop-blur-sm border border-white/40 shadow-[0_4px_15px_-10px_rgba(0,0,0,0.03)] transition-all duration-300 active:scale-[0.98]"
+      className="result-card block relative z-0 opacity-0 w-full p-6 rounded-[16px] bg-white/60 hover:bg-white/80 backdrop-blur-sm border border-white/40 shadow-[0_4px_15px_-10px_rgba(0,0,0,0.03)] transition-all duration-300 active:scale-[0.98] will-change-transform transform-gpu"
     >
       <div className="flex items-start justify-between mb-3">
         <h2 className="text-xl font-medium text-theme-text leading-tight pr-4">{item.title}</h2>
