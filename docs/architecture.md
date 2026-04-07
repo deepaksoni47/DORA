@@ -178,7 +178,7 @@ Meaning:
 
 Start with a single search endpoint:
 
-`GET /api/v1/search?q=machine+learning&type=paper&year=2024`
+`GET /api/search?q=machine+learning&type=paper&years=2026`
 
 Later we can add:
 
